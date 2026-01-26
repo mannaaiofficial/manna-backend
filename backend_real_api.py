@@ -3,6 +3,7 @@ import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from dotenv import load_dotenv
 
 # 1. Load Environment Variables
@@ -18,6 +19,21 @@ if not API_KEY:
 else:
     genai.configure(api_key=API_KEY)
     print("✅ AI Brain Connected.")
+
+# --- THE FIX: Configure the Model ONCE Globally ---
+# This specific config forces the AI to behave and use the right API version
+generation_config = {
+  "temperature": 0.7,
+  "top_p": 1,
+  "top_k": 1,
+  "max_output_tokens": 2048,
+}
+
+# We initialize the model here (Global Scope) so it's ready instantly
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    generation_config=generation_config
+)
 
 # --- HELPER: CLEAN JSON ---
 def clean_ai_response(text):
@@ -54,7 +70,7 @@ def generate_shop():
     """
 
     try:
-        model = genai.GenerativeModel('gemini-pro)
+        # Use the global 'model' we defined at the top
         response = model.generate_content(prompt)
         clean_json = clean_ai_response(response.text)
         return jsonify(json.loads(clean_json))
@@ -90,7 +106,7 @@ def generate_recipes():
     """
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Use the global 'model' we defined at the top
         response = model.generate_content(prompt)
         clean_json = clean_ai_response(response.text)
         return jsonify(json.loads(clean_json))

@@ -27,9 +27,11 @@ generation_config = {
   "max_output_tokens": 2048,
 }
 
+# THE CORRECT COMBINED VERSION:
 model = genai.GenerativeModel(
     model_name="gemini-flash-latest", 
     generation_config=generation_config
+)
 )
 
 def clean_ai_response(text):

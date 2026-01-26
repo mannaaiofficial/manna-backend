@@ -28,11 +28,8 @@ generation_config = {
 }
 
 # THE CORRECT COMBINED VERSION:
-model = genai.GenerativeModel(
-    model_name="gemini-flash-latest", 
-    generation_config=generation_config
-)
-)
+model = genai.GenerativeModel('gemini-flash-latest', generation_config=generation_config)
+
 
 def clean_ai_response(text):
     """Cleans up the AI's response to ensure valid JSON."""

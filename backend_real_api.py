@@ -54,7 +54,7 @@ def generate_shop():
     """
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro)
         response = model.generate_content(prompt)
         clean_json = clean_ai_response(response.text)
         return jsonify(json.loads(clean_json))

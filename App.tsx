@@ -11,7 +11,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// --- 🎨 THEME ---
+// --- 🎨 THEME --
 const BG_DARK = '#0D0D0D';       
 const CARD_DARK = '#1C1C1E';     
 const ACCENT = '#D4F000';        
@@ -21,7 +21,7 @@ const INPUT_BG = '#2C2C2E';
 
 // --- 🔧 CONFIGURATION ---
 // REPLACE THIS WITH YOUR CURRENT TUNNEL URL
-const TUNNEL_URL = 'https://hannah-manna-final.loca.lt';
+const TUNNEL_URL = 'https://manna-backend-1.onrender.com'
 
 // --- TYPES ---
 type InventoryItem = { id: string; name: string; quantity: number; unit: string; daysLeft: number; icon: string };

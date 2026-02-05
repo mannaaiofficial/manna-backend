@@ -32,7 +32,7 @@ model = genai.GenerativeModel(
         "5. OUTPUT FORMAT: Always return a JSON array of 3 recipe objects. Each must include: "
         "6. RATIONING LOGIC: You are a resource manager. Check 'daysRemaining'. "
         "Proportionally divide ingredients so the user does not run out of food before their next shop. "
-        "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g.
+        "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g."
         "id, title, description, calories, macros (p, c, f), time, ingredients (name and amount), "
         "instructions (step-by-step), and a relevant Unsplash image URL."
         

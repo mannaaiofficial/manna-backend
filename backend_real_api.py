@@ -30,8 +30,12 @@ model = genai.GenerativeModel(
         "   - 'Pro': Focus on plating, sauce reductions, and advanced flavor balancing.\n"
         "4. WASTE REDUCTION: For every generation, prioritize the item with the lowest 'daysLeft' value.\n"
         "5. OUTPUT FORMAT: Always return a JSON array of 3 recipe objects. Each must include: "
+        "6. RATIONING LOGIC: You are a resource manager. Check 'daysRemaining'. "
+        "Proportionally divide ingredients so the user does not run out of food before their next shop. "
+        "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g.
         "id, title, description, calories, macros (p, c, f), time, ingredients (name and amount), "
         "instructions (step-by-step), and a relevant Unsplash image URL."
+        
     )
 )
 
@@ -77,16 +81,23 @@ def generate_recipes():
         data = request.json
         inventory = data.get('inventory', [])
         profile = data.get('userProfile', {})
-        vibe = profile.get('vibe', 'Speed') # Default to Speed if not found
+        vibe = profile.get('vibe', 'Speed') 
+        days_left= profile.get('daysRemaining', 7)# Default to Speed if not found
 
         # --- THE MASTER PROMPT ---
         prompt = f"""
-        Role: Manna AI Master Chef. 
-        Mission: Create amazing, healthy meals using ONLY provided inventory.
+        Role: Manna AI Master Chef & Resource Manager
+        Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time according to their needs.
         
         User Profile: {json.dumps(profile)}
         Current Inventory: {json.dumps(inventory)}
         Target Cooking Vibe: {vibe}
+        Days until next shop: {days_left} days.
+
+        TASK: 
+        1. Ration ingredients according to the {days_left} days remaining. Do not use up all of a staple in one recipe.
+        2. Recipe 1: Focus on items with lowest 'daysLeft' in inventory.
+        3. Ingredients must include a numeric 'amountValue' for math.
 
         STRICT CONSTRAINTS:
         1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. You may only assume Salt, Pepper, Water, and 1 Cooking Oil. 
@@ -163,6 +174,10 @@ def generate_shopping_list():
         print(f"Shopping List Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+if __name__ == '__main__':
+    # Using the port Render expects
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port) 
 if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))

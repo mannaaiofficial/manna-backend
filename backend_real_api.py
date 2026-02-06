@@ -114,7 +114,7 @@ def generate_recipes():
         - "title": appetizing name
         - "description": why this is healthy/amazing
         - "calories": number
-        - "macros": {{"p": protein, "c": carbs, "f": fats}}
+        - "macros": {{ "p": "number", "c": "number", "f": "fats" }}
         - "time": string (e.g. "12 mins")
         - "ingredients": [
             { 

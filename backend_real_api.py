@@ -41,16 +41,30 @@ model = genai.GenerativeModel(
 
 # --- 2. THE CLEANER ---
 def clean_gemini_json(text):
-    """Filter to ensure we only send pure JSON to the app."""
+    """Bulletproof filter to extract JSON even if the AI adds chatter."""
     try:
+        # 1. Remove markdown code blocks if they exist
         clean = text.replace("```json", "").replace("```", "").strip()
+        
+        # 2. Find the FIRST '[' and the LAST ']'
         start = clean.find("[")
         end = clean.rfind("]")
+        
         if start != -1 and end != -1:
-            clean = clean[start:end + 1]
-        return json.loads(clean)
+            json_str = clean[start:end + 1]
+            return json.loads(json_str)
+        
+        # 3. Fallback: If it's an object with a 'recipes' key instead of a list
+        start_obj = clean.find("{")
+        end_obj = clean.rfind("}")
+        if start_obj != -1:
+            data = json.loads(clean[start_obj:end_obj + 1])
+            return data.get('recipes', data) # Return the list inside or the object
+            
+        return []
     except Exception as e:
-        print(f"Cleaner failed: {e}")
+        print(f"CRITICAL CLEANER ERROR: {e}")
+        print(f"RAW TEXT THAT FAILED: {text[:200]}...") # See the first 200 chars
         return []
 
 # --- 3. THE BIO-CALCULATOR ---
@@ -82,52 +96,64 @@ def generate_recipes():
         inventory = data.get('inventory', [])
         profile = data.get('userProfile', {})
         vibe = profile.get('vibe', 'Speed') 
-        days_left= profile.get('daysRemaining', 7)# Default to Speed if not found
+        days_left = profile.get('daysRemaining', 7)
 
-        # --- THE MASTER PROMPT ---
-        prompt = f"""
+        # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
+        prompt = """
         Role: Manna AI Master Chef & Resource Manager
-        Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time according to their needs.
+        Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
         
-        User Profile: {json.dumps(profile)}
-        Current Inventory: {json.dumps(inventory)}
-        Target Cooking Vibe: {vibe}
-        Days until next shop: {days_left} days.
+        User Profile: {user_profile}
+        Current Inventory: {inventory_data}
+        Target Cooking Vibe: {vibe_style}
+        Days until next shop: {days} days.
 
         TASK: 
-        1. Ration ingredients according to the {days_left} days remaining. Do not use up all of a staple in one recipe.
+        1. Ration ingredients according to the {days} days remaining. 
         2. Recipe 1: Focus on items with lowest 'daysLeft' in inventory.
-        3. Ingredients must include a numeric 'amountValue' for math.
+        3. Ingredients must include a numeric 'amountValue' for math subtraction.
 
         STRICT CONSTRAINTS:
-        1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. You may only assume Salt, Pepper, Water, and 1 Cooking Oil. 
-        2. DIETARY PURITY: Strictly follow the {profile.get('diet')} diet. Do not cross-contaminate.
-        3. ZERO-WASTE PRIORITY: Recipe 1 MUST center around the item with the lowest 'daysLeft'.
-        4. VIBE EXECUTION: 
-           - If 'Speed': Recipes must be 15 mins max, simple steps, 1 pan.
-           - If 'Therapy': Focus on technique, aroma, and mindful preparation.
-           - If 'Pro': Focus on presentation, reduction, and chef-level flavor balance.
+        1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. (Salt, Pepper, Water, and 1 Oil allowed). 
+        2. DIETARY PURITY: Strictly follow the diet specified in the profile.
+        3. ZERO-WASTE PRIORITY: Focus on using up expiring items first.
 
         OUTPUT FORMAT:
         Return ONLY a JSON list of 3 recipe objects. Each must have:
         - "id": unique string
         - "title": appetizing name
-        - "description": why this is healthy/amazing
+        - "description": description
         - "calories": number
-        - "macros": {{ "p": "number", "c": "number", "f": "fats" }}
-        - "time": string (e.g. "12 mins")
+        - "macros": {{ "p": number, "c": number, "f": number }}
+        - "time": string
         - "ingredients": [
-            { 
-              "name": "item", 
+            {{ 
+              "name": "match inventory exactly", 
               "amount": "150g", 
               "amountValue": 150, 
               "unit": "g" 
-            }
+            }}
           ]
-          (IMPORTANT: 'name' must match inventory exactly. 'amountValue' must be a RAW NUMBER for math subtraction.)
         - "instructions": [string steps]
-        - "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80" (use a high-quality food photo ID)
-        """
+        - "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
+        """.format(
+            user_profile=json.dumps(profile),
+            inventory_data=json.dumps(inventory),
+            vibe_style=vibe,
+            days=days_left
+        )
+
+        # Use the model with the system_instruction configured earlier
+        response = model.generate_content(prompt)
+        
+        # Clean and validate the JSON
+        recipes = clean_gemini_json(response.text)
+        
+        return jsonify(recipes)
+
+    except Exception as e:
+        print(f"Error in Recipe Generation: {e}")
+        return jsonify({"error": str(e)}), 500
 
         # Use the model with the system_instruction we configured earlier
         response = model.generate_content(prompt)

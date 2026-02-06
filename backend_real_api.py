@@ -116,7 +116,15 @@ def generate_recipes():
         - "calories": number
         - "macros": {{"p": protein, "c": carbs, "f": fats}}
         - "time": string (e.g. "12 mins")
-        - "ingredients": [{{ "name": "item", "amount": "qty" }}] (must match inventory names)
+        - "ingredients": [
+            { 
+              "name": "item", 
+              "amount": "150g", 
+              "amountValue": 150, 
+              "unit": "g" 
+            }
+          ]
+          (IMPORTANT: 'name' must match inventory exactly. 'amountValue' must be a RAW NUMBER for math subtraction.)
         - "instructions": [string steps]
         - "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80" (use a high-quality food photo ID)
         """
@@ -174,10 +182,6 @@ def generate_shopping_list():
         print(f"Shopping List Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    # Using the port Render expects
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port) 
 if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))

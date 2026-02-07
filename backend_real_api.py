@@ -9,7 +9,8 @@ import PIL.Image
 app = Flask(__name__)
 CORS(app)
 
-# Configure the Gemini Model
+# Move these to the top so all functions can see them
+# --- 1. CONFIGURATION ---
 model = genai.GenerativeModel(
     model_name='gemini-2.5-flash-lite',
     generation_config={"response_mime_type": "application/json"},
@@ -33,7 +34,8 @@ model = genai.GenerativeModel(
         "Proportionally divide ingredients so the user does not run out of food before their next shop. "
         "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g."
         "id, title, description, calories, macros (p, c, f), time, ingredients (name and amount), "
-        "instructions (step-by-step), and a relevant Unsplash image URL."
+        "instructions (step-by-step), and a relevant Unsplash image URL.UNIT CONSISTENCY: You MUST use the same 'unit' and 'name' provided in the user's inventory JSON."
+        
     )
 )
 
@@ -65,7 +67,7 @@ def clean_gemini_json(text):
         print(f"RAW TEXT THAT FAILED: {text[:200]}...") # See the first 200 chars
         return []
 
-# --- 3. THE BIO-CALCULATOR ---
+# --- 3. THE BIO-CALCULATOR (FINAL MVP VERSION) ---
 def get_caloric_needs(data):
     """
     Calculates exact caloric and protein needs using the Mifflin-St Jeor Equation.
@@ -111,7 +113,6 @@ def get_caloric_needs(data):
     except Exception as e:
         print(f"Bio-Calculator Error: {e}")
         return 2000, 130 # Safe fallback for standard student needs
-
 # --- 4. ROUTES ---
 
 @app.route('/')
@@ -122,13 +123,14 @@ def home():
 def generate_recipes():
     try:
         data = request.json
-        inventory = data.get('inventory', [])
-        profile = data.get('userProfile', {})
-        vibe = profile.get('vibe', 'Speed')
-        days_left = int(profile.get('daysRemaining', 7))
+inventory = data.get('inventory', []) # Remove comma
+profile = data.get('userProfile', {})  # Remove comma
+vibe = profile.get('vibe', 'Speed')    # Remove comma
+days_left = int(profile.get('daysRemaining', 7)) # Remove comma
 
-        target_cals, target_protein = get_caloric_needs(profile)
-
+# This line is perfect as is
+target_cals, target_protein = get_caloric_needs(profile)
+        # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
         Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
@@ -140,9 +142,11 @@ def generate_recipes():
         Days until next shop: {days} days.
 
         TASK: 
-        1. Ration ingredients according to the {days} days remaining. 
-        2. Recipe 1: Focus on items with lowest 'daysLeft' in inventory.
-        3. Ingredients must include a numeric 'amountValue' for math subtraction.
+1. MANDATORY RATIONING: You must calculate a budget for every ingredient: (Total Quantity ÷ {days} days). 
+   The 'amountValue' for EACH recipe MUST be less than or equal to this daily budget. 
+   *Example: If user has 500g Beef and 5 days left, 'amountValue' for one recipe cannot exceed 100g.*
+2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory data provided.
+3. DATA TYPE: The 'amountValue' must be a raw Number, not a string.
 
         STRICT CONSTRAINTS:
         1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. (Salt, Pepper, Water, and 1 Oil allowed). 
@@ -171,14 +175,26 @@ def generate_recipes():
             user_profile=json.dumps(profile),
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
-            days=days_left,
-            target_cals=target_cals
+            days=days_left
+            Daily Target: {target_cals}
         )
 
         # Use the model with the system_instruction configured earlier
         response = model.generate_content(prompt)
         
         # Clean and validate the JSON
+        recipes = clean_gemini_json(response.text)
+        
+        return jsonify(recipes)
+
+    except Exception as e:
+        print(f"Error in Recipe Generation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+        # Use the model with the system_instruction we configured earlier
+        response = model.generate_content(prompt)
+        
+        # Clean and validate the JSON to prevent frontend crashes
         recipes = clean_gemini_json(response.text)
         
         return jsonify(recipes)
@@ -201,6 +217,7 @@ def generate_shopping_list():
         # Calculate rough carb quota (approx 45% of energy)
         total_carbs_g = round(((target_cals * 0.45) / 4) * days)
 
+        # This prompt forces a high-density, metric-accurate procurement list
         prompt = f"""
         Role: Manna AI Strategic Procurement Agent.
         User: {name}
@@ -241,10 +258,6 @@ def generate_shopping_list():
         print(f"Shopping List Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    # Using the port Render expects
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
 if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))

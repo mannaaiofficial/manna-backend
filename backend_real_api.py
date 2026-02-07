@@ -172,7 +172,7 @@ def generate_recipes():
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
             days=days_left
-            Daily Target: {target_cals}
+            target_cals=target_cals
         )
 
         # Use the model with the system_instruction configured earlier

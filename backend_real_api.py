@@ -123,11 +123,13 @@ def home():
 def generate_recipes():
     try:
         data = request.json
-        inventory = data.get('inventory', [])
-        profile = data.get('userProfile', {})
-        vibe = profile.get('vibe', 'Speed') 
-        days_left = int(profile.get('daysRemaining', 7))
-        target_cals, target_protein = get_caloric_needs(profile)
+inventory = data.get('inventory', []) # Remove comma
+profile = data.get('userProfile', {})  # Remove comma
+vibe = profile.get('vibe', 'Speed')    # Remove comma
+days_left = int(profile.get('daysRemaining', 7)) # Remove comma
+
+# This line is perfect as is
+target_cals, target_protein = get_caloric_needs(profile)
         # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
@@ -172,7 +174,7 @@ def generate_recipes():
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
             days=days_left
-            target_cals=target_cals
+            Daily Target: {target_cals}
         )
 
         # Use the model with the system_instruction configured earlier
@@ -253,6 +255,11 @@ def generate_shopping_list():
     except Exception as e:
         print(f"Shopping List Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    # Using the port Render expects
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port) 
 
 if __name__ == '__main__':
     # Using the port Render expects

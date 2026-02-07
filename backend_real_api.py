@@ -67,22 +67,52 @@ def clean_gemini_json(text):
         print(f"RAW TEXT THAT FAILED: {text[:200]}...") # See the first 200 chars
         return []
 
-# --- 3. THE BIO-CALCULATOR ---
+# --- 3. THE BIO-CALCULATOR (FINAL MVP VERSION) ---
 def get_caloric_needs(data):
-    goal = data.get('goal', 'Energy').lower()
-    calories = 2000
-    protein = 120
-    if "weight" in goal:
-        calories = 1600
-        protein = 140
-    elif "muscle" in goal:
-        calories = 2400
-        protein = 180
-    elif "energy" in goal:
-        calories = 2200
-        protein = 130
-    return calories, protein
+    """
+    Calculates exact caloric and protein needs using the Mifflin-St Jeor Equation.
+    This is the 'brain' that ensures accuracy for different body types.
+    """
+    try:
+        # Extract data with safe defaults for a young student
+        weight = float(data.get('weight', 70))
+        height = float(data.get('height', 170))
+        age = int(data.get('age', 20))
+        gender = data.get('gender', 'female').lower()
+        activity = data.get('activityLevel', 'moderate').lower()
+        goal = data.get('goal', 'energy').lower()
 
+        # 1. Calculate Basal Metabolic Rate (BMR)
+        if gender == 'male':
+            bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
+        else:
+            bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
+
+        # 2. Apply Activity Multiplier (TDEE)
+        multipliers = {
+            'sedentary': 1.2, 
+            'moderate': 1.55, 
+            'active': 1.725, 
+            'athlete': 1.9
+        }
+        tdee = bmr * multipliers.get(activity, 1.2)
+
+        # 3. Goal Adjustment & Protein Scaling
+        if "loss" in goal or "weight" in goal:
+            calories = tdee - 500
+            protein = weight * 2.0  # Higher protein helps with satiety during loss
+        elif "muscle" in goal or "bulk" in goal:
+            calories = tdee + 400
+            protein = weight * 2.2  # Max protein for muscle synthesis
+        else:
+            calories = tdee
+            protein = weight * 1.6  # Maintenance baseline
+
+        return round(calories), round(protein)
+
+    except Exception as e:
+        print(f"Bio-Calculator Error: {e}")
+        return 2000, 130 # Safe fallback for standard student needs
 # --- 4. ROUTES ---
 
 @app.route('/')
@@ -96,14 +126,15 @@ def generate_recipes():
         inventory = data.get('inventory', [])
         profile = data.get('userProfile', {})
         vibe = profile.get('vibe', 'Speed') 
-        days_left = profile.get('daysRemaining', 7)
-
+        days_left = int(profile.get('daysRemaining', 7))
+        target_cals, target_protein = get_caloric_needs(profile)
         # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
         Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
         
         User Profile: {user_profile}
+        Daily Target: {target_cals}
         Current Inventory: {inventory_data}
         Target Cooking Vibe: {vibe_style}
         Days until next shop: {days} days.
@@ -141,6 +172,7 @@ def generate_recipes():
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
             days=days_left
+            Daily Target: {target_cals}
         )
 
         # Use the model with the system_instruction configured earlier
@@ -172,8 +204,14 @@ def generate_shopping_list():
     try:
         data = request.json
         profile = data.get('userProfile', {})
-        days = data.get('days', 7)
+        days = int(data.get('days', 7))
         name = profile.get('name', 'Student')
+
+        target_cals, target_protein = get_caloric_needs(profile)
+        total_period_cals = target_cals * days
+        total_protein_g = target_protein * days
+        # Calculate rough carb quota (approx 45% of energy)
+        total_carbs_g = round(((target_cals * 0.45) / 4) * days)
 
         # This prompt forces a high-density, metric-accurate procurement list
         prompt = f"""
@@ -183,14 +221,22 @@ def generate_shopping_list():
         Diet: {profile.get('diet')}
         Duration: {days} days.
 
-        TASK: Create a foundation shopping list that maximizes nutrition and minimizes waste.
+        PRECISION LOGISTICS:
+        - Background Daily Target: {target_cals} kcal/day.
+        - Total Period Target: {total_period_cals} total calories.
+        - Required Protein Volume: Total of {total_protein_g}g from all protein sources.
+        - Required Carb Volume: Total of {total_carbs_g}g from all grain/starch sources.
+
+        TASK: Create a foundation shopping list that maximizes nutrition, fulfills these exact caloric needs, and minimizes waste.
         
         ACCURACY REQUIREMENTS:
         1. **Metric Precision**: All 'amount' values must be in metric units (grams, kg, ml, liters) or specific counts (e.g., '6 Large Eggs').
         2. **The 'Why'**: Every item must have a 'why' that connects directly to the user's goal ({profile.get('goal')}).
         3. **Substitutes**: Provide a smart substitute for every item in case it is out of stock.
         4. **Zero-Waste Foundation**: Only suggest items that have multiple uses (versatile ingredients).
-
+        5. **Logistical Sizing**: Scale the 'amount' of staples so the total volume of food is appropriate for a {days}-day period for someone with the user's goal. (Background target: {target_cals} kcal/day).
+        6. **Retail Scaling**: Round all amounts to standard supermarket sizes (e.g., 250g, 500g, 1kg, 1L). No weird decimals like "1.14kg."
+        
         OUTPUT FORMAT:
         Return ONLY a JSON array of objects with these exact keys:
         - "name": String (include an emoji 🍎)

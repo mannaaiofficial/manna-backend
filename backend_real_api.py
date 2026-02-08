@@ -9,6 +9,8 @@ import PIL.Image
 app = Flask(__name__)
 CORS(app)
 
+# Move these to the top so all functions can see them
+# --- 1. CONFIGURATION ---
 model = genai.GenerativeModel(
     model_name='gemini-2.5-flash-lite',
     generation_config={"response_mime_type": "application/json"},
@@ -33,6 +35,7 @@ model = genai.GenerativeModel(
         "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g."
         "id, title, description, calories, macros (p, c, f), time, ingredients (name and amount), "
         "instructions (step-by-step), and a relevant Unsplash image URL.UNIT CONSISTENCY: You MUST use the same 'unit' and 'name' provided in the user's inventory JSON."
+        
     )
 )
 
@@ -40,7 +43,10 @@ model = genai.GenerativeModel(
 def clean_gemini_json(text):
     """Bulletproof filter to extract JSON even if the AI adds chatter."""
     try:
+        # 1. Remove markdown code blocks if they exist
         clean = text.replace("```json", "").replace("```", "").strip()
+        
+        # 2. Find the FIRST '[' and the LAST ']'
         start = clean.find("[")
         end = clean.rfind("]")
         
@@ -48,20 +54,27 @@ def clean_gemini_json(text):
             json_str = clean[start:end + 1]
             return json.loads(json_str)
         
+        # 3. Fallback: If it's an object with a 'recipes' key instead of a list
         start_obj = clean.find("{")
         end_obj = clean.rfind("}")
         if start_obj != -1:
             data = json.loads(clean[start_obj:end_obj + 1])
-            return data.get('recipes', data)
+            return data.get('recipes', data) # Return the list inside or the object
             
         return []
     except Exception as e:
         print(f"CRITICAL CLEANER ERROR: {e}")
+        print(f"RAW TEXT THAT FAILED: {text[:200]}...") # See the first 200 chars
         return []
 
-# --- 3. THE BIO-CALCULATOR ---
+# --- 3. THE BIO-CALCULATOR (FINAL MVP VERSION) ---
 def get_caloric_needs(data):
+    """
+    Calculates exact caloric and protein needs using the Mifflin-St Jeor Equation.
+    This is the 'brain' that ensures accuracy for different body types.
+    """
     try:
+        # Extract data with safe defaults for a young student
         weight = float(data.get('weight', 70))
         height = float(data.get('height', 170))
         age = int(data.get('age', 20))
@@ -69,25 +82,37 @@ def get_caloric_needs(data):
         activity = data.get('activityLevel', 'moderate').lower()
         goal = data.get('goal', 'energy').lower()
 
+        # 1. Calculate Basal Metabolic Rate (BMR)
         if gender == 'male':
             bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
         else:
             bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
 
-        multipliers = {'sedentary': 1.2, 'moderate': 1.55, 'active': 1.725, 'athlete': 1.9}
+        # 2. Apply Activity Multiplier (TDEE)
+        multipliers = {
+            'sedentary': 1.2, 
+            'moderate': 1.55, 
+            'active': 1.725, 
+            'athlete': 1.9
+        }
         tdee = bmr * multipliers.get(activity, 1.2)
 
+        # 3. Goal Adjustment & Protein Scaling
         if "loss" in goal or "weight" in goal:
-            calories, protein = tdee - 500, weight * 2.0
+            calories = tdee - 500
+            protein = weight * 2.0  # Higher protein helps with satiety during loss
         elif "muscle" in goal or "bulk" in goal:
-            calories, protein = tdee + 400, weight * 2.2
+            calories = tdee + 400
+            protein = weight * 2.2  # Max protein for muscle synthesis
         else:
-            calories, protein = tdee, weight * 1.6
+            calories = tdee
+            protein = weight * 1.6  # Maintenance baseline
 
         return round(calories), round(protein)
-    except Exception as e:
-        return 2000, 130
 
+    except Exception as e:
+        print(f"Bio-Calculator Error: {e}")
+        return 2000, 130 # Safe fallback for standard student needs
 # --- 4. ROUTES ---
 
 @app.route('/')
@@ -98,13 +123,14 @@ def home():
 def generate_recipes():
     try:
         data = request.json
-        inventory = data.get('inventory', [])
-        profile = data.get('userProfile', {})
-        vibe = profile.get('vibe', 'Speed')
-        days_left = int(profile.get('daysRemaining', 7))
+inventory = data.get('inventory', []) # Remove comma
+profile = data.get('userProfile', {})  # Remove comma
+vibe = profile.get('vibe', 'Speed')    # Remove comma
+days_left = int(profile.get('daysRemaining', 7)) # Remove comma
 
-        target_cals, target_protein = get_caloric_needs(profile)
-
+# This line is perfect as is
+target_cals, target_protein = get_caloric_needs(profile)
+        # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
         Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
@@ -116,11 +142,11 @@ def generate_recipes():
         Days until next shop: {days} days.
 
         TASK: 
-        1. MANDATORY RATIONING: You must calculate a budget for every ingredient: (Total Quantity ÷ {days} days). 
-           The 'amountValue' for EACH recipe MUST be less than or equal to this daily budget. 
-           *Example: If user has 500g Beef and 5 days left, 'amountValue' for one recipe cannot exceed 100g.*
-        2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory data provided.
-        3. DATA TYPE: The 'amountValue' must be a raw Number, not a string.
+1. MANDATORY RATIONING: You must calculate a budget for every ingredient: (Total Quantity ÷ {days} days). 
+   The 'amountValue' for EACH recipe MUST be less than or equal to this daily budget. 
+   *Example: If user has 500g Beef and 5 days left, 'amountValue' for one recipe cannot exceed 100g.*
+2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory data provided.
+3. DATA TYPE: The 'amountValue' must be a raw Number, not a string.
 
         STRICT CONSTRAINTS:
         1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. (Salt, Pepper, Water, and 1 Oil allowed). 
@@ -149,12 +175,28 @@ def generate_recipes():
             user_profile=json.dumps(profile),
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
-            days=days_left,
-            target_cals=target_cals
+            days=days_left
+            Daily Target: {target_cals}
         )
 
+        # Use the model with the system_instruction configured earlier
         response = model.generate_content(prompt)
+        
+        # Clean and validate the JSON
         recipes = clean_gemini_json(response.text)
+        
+        return jsonify(recipes)
+
+    except Exception as e:
+        print(f"Error in Recipe Generation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+        # Use the model with the system_instruction we configured earlier
+        response = model.generate_content(prompt)
+        
+        # Clean and validate the JSON to prevent frontend crashes
+        recipes = clean_gemini_json(response.text)
+        
         return jsonify(recipes)
 
     except Exception as e:
@@ -172,8 +214,10 @@ def generate_shopping_list():
         target_cals, target_protein = get_caloric_needs(profile)
         total_period_cals = target_cals * days
         total_protein_g = target_protein * days
+        # Calculate rough carb quota (approx 45% of energy)
         total_carbs_g = round(((target_cals * 0.45) / 4) * days)
 
+        # This prompt forces a high-density, metric-accurate procurement list
         prompt = f"""
         Role: Manna AI Strategic Procurement Agent.
         User: {name}
@@ -213,7 +257,49 @@ def generate_shopping_list():
     except Exception as e:
         print(f"Shopping List Error: {e}")
         return jsonify({"error": str(e)}), 500
+        @app.route('/api/inventory/update', methods=['POST'])
+
+        
+def update_inventory():
+    try:
+        data = request.json
+        current_inventory = data.get('inventory', [])
+        cooked_recipe = data.get('recipe', {})
+        ingredients_used = cooked_recipe.get('ingredients', [])
+
+        # Convert current inventory to a dictionary for easier lookup by name
+        inv_dict = {item['name']: item for item in current_inventory}
+        low_stock_items = []
+
+        for used_item in ingredients_used:
+            name = used_item.get('name')
+            # Use the precise amountValue from the AI's recipe
+            used_qty = float(used_item.get('amountValue', 0))
+
+            if name in inv_dict:
+                old_qty = float(inv_dict[name].get('quantity', 0))
+                new_qty = max(0, old_qty - used_qty)
+                
+                # Update the quantity in the dictionary
+                inv_dict[name]['quantity'] = round(new_qty, 2)
+
+                # Identify if the item is now low or empty
+                if new_qty <= (old_qty * 0.2) or new_qty == 0:
+                    low_stock_items.append(name)
+
+        # Remove items that are now at 0 from the list
+        final_inventory = [v for k, v in inv_dict.items() if v['quantity'] > 0]
+
+        return jsonify({
+            "success": True,
+            "updatedInventory": final_inventory,
+            "lowStock": low_stock_items
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port) 
+

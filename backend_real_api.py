@@ -25,9 +25,9 @@ model = genai.GenerativeModel(
         "If a recipe traditionally requires a non-compliant ingredient, do not suggest it unless "
         "a suitable substitute exists in their inventory.\n"
         "3. VIBE-DRIVEN LOGIC: Adapt the complexity and tone of instructions to the 'cookingVibe':\n"
-        "    - 'Speed': Max 15 mins, 1 pan, high efficiency.\n"
-        "    - 'Therapy': Focus on mindful preparation, chopping skills, and relaxation.\n"
-        "    - 'Pro': Focus on plating, sauce reductions, and advanced flavor balancing.\n"
+        "   - 'Speed': Max 15 mins, 1 pan, high efficiency.\n"
+        "   - 'Therapy': Focus on mindful preparation, chopping skills, and relaxation.\n"
+        "   - 'Pro': Focus on plating, sauce reductions, and advanced flavor balancing.\n"
         "4. WASTE REDUCTION: For every generation, prioritize the item with the lowest 'daysLeft' value.\n"
         "5. OUTPUT FORMAT: Always return a JSON array of 3 recipe objects. Each must include: "
         "6. RATIONING LOGIC: You are a resource manager. Check 'daysRemaining'. "
@@ -123,13 +123,13 @@ def home():
 def generate_recipes():
     try:
         data = request.json
-        inventory = data.get('inventory', []) # Remove comma
-        profile = data.get('userProfile', {})  # Remove comma
-        vibe = profile.get('vibe', 'Speed')    # Remove comma
-        days_left = int(profile.get('daysRemaining', 7)) # Remove comma
+inventory = data.get('inventory', []) # Remove comma
+profile = data.get('userProfile', {})  # Remove comma
+vibe = profile.get('vibe', 'Speed')    # Remove comma
+days_left = int(profile.get('daysRemaining', 7)) # Remove comma
 
-        # This line is perfect as is
-        target_cals, target_protein = get_caloric_needs(profile)
+# This line is perfect as is
+target_cals, target_protein = get_caloric_needs(profile)
         # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
@@ -176,14 +176,26 @@ def generate_recipes():
             user_profile=json.dumps(profile),
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
-            days=days_left,
-            target_cals=target_cals
+            days=days_left
+            Daily Target: {target_cals}
         )
 
         # Use the model with the system_instruction configured earlier
         response = model.generate_content(prompt)
         
         # Clean and validate the JSON
+        recipes = clean_gemini_json(response.text)
+        
+        return jsonify(recipes)
+
+    except Exception as e:
+        print(f"Error in Recipe Generation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+        # Use the model with the system_instruction we configured earlier
+        response = model.generate_content(prompt)
+        
+        # Clean and validate the JSON to prevent frontend crashes
         recipes = clean_gemini_json(response.text)
         
         return jsonify(recipes)
@@ -221,6 +233,11 @@ def generate_shopping_list():
         - Required Carb Volume: Total of {total_carbs_g}g from all grain/starch sources.
 
         TASK: Create a foundation shopping list that maximizes nutrition, fulfills these exact caloric needs, and minimizes waste.
+        The 'Diverse Pantry' Rule: Do not allow any single starch (Oats, Rice, Pasta) to exceed 40% of the total carb volume.
+
+        Unit Caps: Strictly limit staples to 500g max for a 7-day period. Force the remaining carb/calorie quota to be filled by fruits, vegetables, or secondary grains (e.g., sweet potatoes, quinoa).
+
+        Recipe Utility: Every item must be part of at least two potential distinct meal types to ensure the user doesn't get bored.
         
         ACCURACY REQUIREMENTS:
         1. **Metric Precision**: All 'amount' values must be in metric units (grams, kg, ml, liters) or specific counts (e.g., '6 Large Eggs').
@@ -229,8 +246,9 @@ def generate_shopping_list():
         4. **Zero-Waste Foundation**: Only suggest items that have multiple uses (versatile ingredients).
         5. **Logistical Sizing**: Scale the 'amount' of staples so the total volume of food is appropriate for a {days}-day period for someone with the user's goal. (Background target: {target_cals} kcal/day).
         6. **Retail Scaling**: Round all amounts to standard supermarket sizes (e.g., 250g, 500g, 1kg, 1L). No weird decimals like "1.14kg."
-        7. STRATEGIC VARIETY: Do NOT suggest huge bulk amounts of a single item (e.g., avoid 1kg of broccoli). Instead, prioritize a diverse range of ingredients in smaller, realistic portions (e.g., 200g-400g for veggies) to ensure the user doesn't get bored and the meals are varied.
+        7. **STRATEGIC VARIETY**: Do NOT suggest huge bulk amounts of a single item (e.g., avoid 1kg of broccoli). Instead, prioritize a diverse range of ingredients in smaller, realistic portions (e.g., 200g-400g for veggies) to ensure the user doesn't get bored and the meals are varied.
         8. THE VARIETY LOCKDOWN: Do not exceed 500g for any dry staple (Oats, Rice, Pasta) unless the user has 10+ days remaining. Prioritize adding 2-3 different small-portion fruits/veg instead of one large bulk item. The list should look 'colorful' and varied with different ingredients to make a lot of varied recipes, not like a survival kit."
+
         
         OUTPUT FORMAT:
         Return ONLY a JSON array of objects with these exact keys:
@@ -257,39 +275,42 @@ def update_inventory():
         cooked_recipe = data.get('recipe', {})
         ingredients_used = cooked_recipe.get('ingredients', [])
 
-        # Convert current inventory to a dictionary for easier lookup by name
-        inv_dict = {item['name']: item for item in current_inventory}
         low_stock_items = []
-
+        
+        # We iterate through the recipe ingredients and find their match in inventory
         for used_item in ingredients_used:
-            name = used_item.get('name')
-            # Use the precise amountValue from the AI's recipe
+            used_name = used_item.get('name', '').lower().strip()
             used_qty = float(used_item.get('amountValue', 0))
 
-            if name in inv_dict:
-                old_qty = float(inv_dict[name].get('quantity', 0))
-                new_qty = max(0, old_qty - used_qty)
+            for inventory_item in current_inventory:
+                inventory_name = inventory_item.get('name', '').lower().strip()
                 
-                # Update the quantity in the dictionary
-                inv_dict[name]['quantity'] = round(new_qty, 2)
+                # FUZZY MATCH: If 'Oats' is in 'Rolled Oats' OR vice versa
+                if used_name in inventory_name or inventory_name in used_name:
+                    old_qty = float(inventory_item.get('quantity', 0))
+                    new_qty = max(0, old_qty - used_qty)
+                    
+                    inventory_item['quantity'] = round(new_qty, 2)
 
-                # Identify if the item is now low or empty
-                if new_qty <= (old_qty * 0.2) or new_qty == 0:
-                    low_stock_items.append(name)
+                    # Trigger low stock alert if under 20%
+                    if 0 < new_qty <= (old_qty * 0.2):
+                        low_stock_items.append(inventory_item['name'])
+                    break 
 
-        # Remove items that are now at 0 from the list
-        final_inventory = [v for k, v in inv_dict.items() if v['quantity'] > 0]
+        # Filter out items that are effectively empty (less than 0.01)
+        final_inventory = [item for item in current_inventory if float(item.get('quantity', 0)) > 0.01]
 
         return jsonify({
             "success": True,
             "updatedInventory": final_inventory,
-            "lowStock": low_stock_items
+            "lowStock": list(set(low_stock_items)) # Remove duplicates
         })
     except Exception as e:
+        print(f"Inventory Update Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port) 
 

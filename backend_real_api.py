@@ -229,7 +229,8 @@ def generate_shopping_list():
         4. **Zero-Waste Foundation**: Only suggest items that have multiple uses (versatile ingredients).
         5. **Logistical Sizing**: Scale the 'amount' of staples so the total volume of food is appropriate for a {days}-day period for someone with the user's goal. (Background target: {target_cals} kcal/day).
         6. **Retail Scaling**: Round all amounts to standard supermarket sizes (e.g., 250g, 500g, 1kg, 1L). No weird decimals like "1.14kg."
-        7. **STRATEGIC VARIETY**: Do NOT suggest huge bulk amounts of a single item (e.g., avoid 1kg of broccoli). Instead, prioritize a diverse range of ingredients in smaller, realistic portions (e.g., 200g-400g for veggies) to ensure the user doesn't get bored and the meals are varied.
+        7. STRATEGIC VARIETY: Do NOT suggest huge bulk amounts of a single item (e.g., avoid 1kg of broccoli). Instead, prioritize a diverse range of ingredients in smaller, realistic portions (e.g., 200g-400g for veggies) to ensure the user doesn't get bored and the meals are varied.
+        8. THE VARIETY LOCKDOWN: Do not exceed 500g for any dry staple (Oats, Rice, Pasta) unless the user has 10+ days remaining. Prioritize adding 2-3 different small-portion fruits/veg instead of one large bulk item. The list should look 'colorful' and varied with different ingredients to make a lot of varied recipes, not like a survival kit."
         
         OUTPUT FORMAT:
         Return ONLY a JSON array of objects with these exact keys:

@@ -25,9 +25,9 @@ model = genai.GenerativeModel(
         "If a recipe traditionally requires a non-compliant ingredient, do not suggest it unless "
         "a suitable substitute exists in their inventory.\n"
         "3. VIBE-DRIVEN LOGIC: Adapt the complexity and tone of instructions to the 'cookingVibe':\n"
-        "   - 'Speed': Max 15 mins, 1 pan, high efficiency.\n"
-        "   - 'Therapy': Focus on mindful preparation, chopping skills, and relaxation.\n"
-        "   - 'Pro': Focus on plating, sauce reductions, and advanced flavor balancing.\n"
+        "    - 'Speed': Max 15 mins, 1 pan, high efficiency.\n"
+        "    - 'Therapy': Focus on mindful preparation, chopping skills, and relaxation.\n"
+        "    - 'Pro': Focus on plating, sauce reductions, and advanced flavor balancing.\n"
         "4. WASTE REDUCTION: For every generation, prioritize the item with the lowest 'daysLeft' value.\n"
         "5. OUTPUT FORMAT: Always return a JSON array of 3 recipe objects. Each must include: "
         "6. RATIONING LOGIC: You are a resource manager. Check 'daysRemaining'. "
@@ -123,13 +123,13 @@ def home():
 def generate_recipes():
     try:
         data = request.json
-inventory = data.get('inventory', []) # Remove comma
-profile = data.get('userProfile', {})  # Remove comma
-vibe = profile.get('vibe', 'Speed')    # Remove comma
-days_left = int(profile.get('daysRemaining', 7)) # Remove comma
+        inventory = data.get('inventory', []) # Remove comma
+        profile = data.get('userProfile', {})  # Remove comma
+        vibe = profile.get('vibe', 'Speed')    # Remove comma
+        days_left = int(profile.get('daysRemaining', 7)) # Remove comma
 
-# This line is perfect as is
-target_cals, target_protein = get_caloric_needs(profile)
+        # This line is perfect as is
+        target_cals, target_protein = get_caloric_needs(profile)
         # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
@@ -176,26 +176,14 @@ target_cals, target_protein = get_caloric_needs(profile)
             user_profile=json.dumps(profile),
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
-            days=days_left
-            Daily Target: {target_cals}
+            days=days_left,
+            target_cals=target_cals
         )
 
         # Use the model with the system_instruction configured earlier
         response = model.generate_content(prompt)
         
         # Clean and validate the JSON
-        recipes = clean_gemini_json(response.text)
-        
-        return jsonify(recipes)
-
-    except Exception as e:
-        print(f"Error in Recipe Generation: {e}")
-        return jsonify({"error": str(e)}), 500
-
-        # Use the model with the system_instruction we configured earlier
-        response = model.generate_content(prompt)
-        
-        # Clean and validate the JSON to prevent frontend crashes
         recipes = clean_gemini_json(response.text)
         
         return jsonify(recipes)
@@ -302,6 +290,5 @@ def update_inventory():
 if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port) 
-
+    app.run(host='0.0.0.0', port=port)
 

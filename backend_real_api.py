@@ -35,7 +35,6 @@ model = genai.GenerativeModel(
         "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g."
         "id, title, description, calories, macros (p, c, f), time, ingredients (name and amount), "
         "instructions (step-by-step), and a relevant Unsplash image URL.UNIT CONSISTENCY: You MUST use the same 'unit' and 'name' provided in the user's inventory JSON."
-        
     )
 )
 
@@ -113,6 +112,7 @@ def get_caloric_needs(data):
     except Exception as e:
         print(f"Bio-Calculator Error: {e}")
         return 2000, 130 # Safe fallback for standard student needs
+
 # --- 4. ROUTES ---
 
 @app.route('/')
@@ -123,15 +123,16 @@ def home():
 def generate_recipes():
     try:
         data = request.json
-        inventory = data.get('inventory', []) # Remove comma
-        profile = data.get('userProfile', {})  # Remove comma
-        vibe = profile.get('vibe', 'Speed')    # Remove comma
+        inventory = data.get('inventory', [])
+        profile = data.get('userProfile', {})
+        vibe = profile.get('vibe', 'Speed')
         days_left = int(profile.get('daysRemaining', 7)) 
         tastes = profile.get('tastes', {})
         meal_context = profile.get('mealContext', 'Meal')
 
         # This line is perfect as is
         target_cals, target_protein = get_caloric_needs(profile)
+        
         # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
@@ -206,6 +207,7 @@ def generate_shopping_list():
         profile = data.get('userProfile', {})
         days = int(data.get('days', 7))
         name = profile.get('name', 'Student')
+        tastes = profile.get('tastes', {})
 
         target_cals, target_protein = get_caloric_needs(profile)
         total_period_cals = target_cals * days
@@ -220,12 +222,18 @@ def generate_shopping_list():
         Goal: {profile.get('goal')}
         Diet: {profile.get('diet')}
         Duration: {days} days.
+        Taste Profile: {json.dumps(tastes)}
 
         PRECISION LOGISTICS:
         - Background Daily Target: {target_cals} kcal/day.
         - Total Period Target: {total_period_cals} total calories.
         - Required Protein Volume: Total of {total_protein_g}g from all protein sources.
         - Required Carb Volume: Total of {total_carbs_g}g from all grain/starch sources.
+
+        STRICT TASTE ENFORCEMENT:
+        1. **Flavor Alignment**: You MUST include at least 3 specific aromatics or condiments that match the user's Craved Flavors (e.g., if 'Spicy', add Chili Flakes/Hot Sauce; if 'Tangy', add Vinegar/Lemon; if 'Creamy', add Greek Yogurt/Parmesan). 
+        2. **Seasoning Level**: If user seasoning is 'Bold', you are FORBIDDEN from suggesting a list without at least 2 dry spices or fresh herbs (Garlic, Ginger, Cumin, etc.).
+        3. **Breakfast Logic**: If Breakfast Style is 'Savory', prioritize eggs/proteins. If 'Sweet', prioritize fruits/grains.
 
         TASK: Create a foundation shopping list that maximizes nutrition, fulfills these exact caloric needs, and minimizes waste.
         The 'Diverse Pantry' Rule: Do not allow any single starch (Oats, Rice, Pasta) to exceed 40% of the total carb volume.
@@ -234,20 +242,23 @@ def generate_shopping_list():
 
         Recipe Utility: Every item must be part of at least two potential distinct meal types to ensure the user doesn't get bored.
         7. THE RAINBOW RULE: Force variety. Suggest at least 4 different colored vegetables.
-        8.STAPLE CAP: Do not exceed 500g of any single staple (Oats/Rice). Split the carb quota between 2-3 different sources (e.g., Potato + Rice + Spaghetti) to prevent repetition.
+        8. STAPLE CAP: Do not exceed 500g of any single staple (Oats/Rice). Split the carb quota between 2-3 different sources (e.g., Potato + Rice + Spaghetti) to prevent repetition.
         9. FLAVOR FOUNDATION: Include base ingredients for sauces/dressings (e.g., Garlic, Lemon, Parm) based on user tastes.
         
+        CULINARY PERSONALITY: 
+        - **Boredom is a Failure**: If the list looks like a 'survival kit' (e.g., just chicken, rice, and broccoli), you have failed. 
+        - **Texture Contrast**: Ensure at least one item provides 'Crunch' (Nuts/Fresh Veg) and one provides 'Creaminess' (Avocado/Dairy/Sauce base).
+
         ACCURACY REQUIREMENTS:
         1. **Metric Precision**: All 'amount' values must be in metric units (grams, kg, ml, liters) or specific counts (e.g., '6 Large Eggs').
         2. **The 'Why'**: Every item must have a 'why' that connects directly to the user's goal ({profile.get('goal')}).
         3. **Substitutes**: Provide a smart substitute for every item in case it is out of stock.
         4. **Zero-Waste Foundation**: Only suggest items that have multiple uses (versatile ingredients).
-        5. **Logistical Sizing**: Scale the 'amount' of staples so the total volume of food is appropriate for a {days}-day period for someone with the user's goal. (Background target: {target_cals} kcal/day).
-        6. **Retail Scaling**: Round all amounts to standard supermarket sizes (e.g., 250g, 500g, 1kg, 1L). No weird decimals like "1.14kg."
-        7. **STRATEGIC VARIETY**: Do NOT suggest huge bulk amounts of a single item (e.g., avoid 1kg of broccoli). Instead, prioritize a diverse range of ingredients in smaller, realistic portions (e.g., 200g-400g for veggies) to ensure the user doesn't get bored and the meals are varied.
-        8. THE VARIETY LOCKDOWN: Do not exceed 500g for any dry staple (Oats, Rice, Pasta) unless the user has 10+ days remaining. Prioritize adding 2-3 different small-portion fruits/veg instead of one large bulk item. The list should look 'colorful' and varied with different ingredients to make a lot of varied recipes, not like a survival kit."
+        5. **Logistical Sizing**: Scale the 'amount' of staples so the total volume of food is appropriate for a {days}-day period for someone with the user's goal.
+        6. **Retail Scaling**: Round all amounts to standard supermarket sizes (e.g., 250g, 500g, 1kg, 1L).
+        7. **STRATEGIC VARIETY**: Prioritize a diverse range of ingredients in smaller, realistic portions (e.g., 200g-400g for veggies).
+        8. **THE VARIETY LOCKDOWN**: Do not exceed 500g for any dry staple. The list should look 'colorful' and varied with different ingredients, not like a survival kit.
 
-        
         OUTPUT FORMAT:
         Return ONLY a JSON array of objects with these exact keys:
         - "name": String (include an emoji 🍎)

@@ -35,6 +35,7 @@ model = genai.GenerativeModel(
         "For example, if they have 1kg of meat for 5 days, suggest 200g per recipe, not 500g."
         "id, title, description, calories, macros (p, c, f), time, ingredients (name and amount), "
         "instructions (step-by-step), and a relevant Unsplash image URL.UNIT CONSISTENCY: You MUST use the same 'unit' and 'name' provided in the user's inventory JSON."
+        
     )
 )
 
@@ -112,7 +113,6 @@ def get_caloric_needs(data):
     except Exception as e:
         print(f"Bio-Calculator Error: {e}")
         return 2000, 130 # Safe fallback for standard student needs
-
 # --- 4. ROUTES ---
 
 @app.route('/')
@@ -128,9 +128,23 @@ def generate_recipes():
         vibe = profile.get('vibe', 'Speed')
         days_left = int(profile.get('daysRemaining', 7)) 
         tastes = profile.get('tastes', {})
-        meal_context = profile.get('mealContext', 'Meal')
+        
+        # --- TIME-OF-DAY INTEGRATION ---
+        # 1. Get current hour to determine the 'Natural' meal
+        current_hour = datetime.now().hour
+        if 5 <= current_hour < 11:
+            default_meal = "Breakfast"
+        elif 11 <= current_hour < 16:
+            default_meal = "Lunch"
+        elif 16 <= current_hour < 22:
+            default_meal = "Dinner"
+        else:
+            default_meal = "Snack"
 
-        # This line is perfect as is
+        # 2. Logic: Priority goes to frontend 'mealType' (the card user clicked),
+        # otherwise defaults to the current clock-based meal.
+        meal_context = data.get('mealType', default_meal)
+
         target_cals, target_protein = get_caloric_needs(profile)
         
         # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
@@ -322,3 +336,4 @@ if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+

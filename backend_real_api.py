@@ -4,6 +4,7 @@ import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import PIL.Image
+from datetime import datetime
 
 # --- 1. CONFIGURATION ---
 app = Flask(__name__)

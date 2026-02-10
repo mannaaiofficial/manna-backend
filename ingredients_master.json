@@ -19,9 +19,7 @@
   {"name":"Red Cabbage","category":"Vegetable","default_shelf_life":21,"typical_unit":"pcs","substitute":"Green Cabbage","tags":["crunchy","fiber","purple"],"calories_per_100":31,"protein_per_100":1.4},
   {"name":"Avocado","category":"Vegetable","default_shelf_life":5,"typical_unit":"pcs","substitute":"Olive Oil","tags":["creamy","healthy-fat","fresh"],"calories_per_100":160,"protein_per_100":2.0},
   {"name":"Fresh Coriander","category":"Vegetable","default_shelf_life":5,"typical_unit":"bag","substitute":"Parsley","tags":["herb","fresh","aromatic"],"calories_per_100":23,"protein_per_100":2.1},
-  {"name":"White Potato","category":"Vegetable","default_shelf_life":30,"typical_unit":"pcs","substitute":"Sweet Potato","tags":["starchy","root","versatile"],"calories_per_100":77,"protein_per_100":2.0}
-
-
+  {"name":"White Potato","category":"Vegetable","default_shelf_life":30,"typical_unit":"pcs","substitute":"Sweet Potato","tags":["starchy","root","versatile"],"calories_per_100":77,"protein_per_100":2.0},
   {"name":"Chicken Breast","category":"Protein","default_shelf_life":3,"typical_unit":"g","substitute":"Turkey Breast","tags":["lean","high-protein","meat"],"calories_per_100":165,"protein_per_100":31},
   {"name":"Salmon Fillet","category":"Protein","default_shelf_life":2,"typical_unit":"g","substitute":"Trout Fillet","tags":["omega-3","fish","fresh"],"calories_per_100":208,"protein_per_100":20},
   {"name":"Canned Tuna","category":"Protein","default_shelf_life":365,"typical_unit":"pcs","substitute":"Canned Sardines","tags":["convenient","lean","protein"],"calories_per_100":116,"protein_per_100":26},
@@ -52,9 +50,7 @@
   "tags": ["carb", "italian", "pantry-staple"],
   "calories_per_100": 371,
   "protein_per_100": 13
-}
-
-
+},
   {"name":"Bananas","category":"Fruit","default_shelf_life":5,"typical_unit":"pcs","substitute":"Plantain","tags":["sweet","potassium","fresh"],"calories_per_100":89,"protein_per_100":1.1},
   {"name":"Apples","category":"Fruit","default_shelf_life":30,"typical_unit":"pcs","substitute":"Pears","tags":["crisp","snack","fiber"],"calories_per_100":52,"protein_per_100":0.3},
   {"name":"Oranges","category":"Fruit","default_shelf_life":14,"typical_unit":"pcs","substitute":"Mandarins","tags":["citrus","vitamin-c","juicy"],"calories_per_100":47,"protein_per_100":0.9},
@@ -95,11 +91,7 @@
   "tags": ["savory", "italian", "sauce"],
   "calories_per_100": 29,
   "protein_per_100": 1.4
-}
-
-]
-```
-[
+}, 
   {"name":"Pork Chops","category":"Protein","default_shelf_life":3,"typical_unit":"g","substitute":"Chicken Thighs","tags":["meaty","juicy","pan-fry"],"calories_per_100":231,"protein_per_100":25},
   {"name":"Pork Belly","category":"Protein","default_shelf_life":3,"typical_unit":"g","substitute":"Bacon","tags":["fatty","rich","savory"],"calories_per_100":518,"protein_per_100":9},
   {"name":"Pork Mince","category":"Protein","default_shelf_life":3,"typical_unit":"g","substitute":"Beef Mince","tags":["ground","versatile","protein"],"calories_per_100":263,"protein_per_100":17},
@@ -166,9 +158,6 @@
   {"name":"Bouillon Powder","category":"Pantry","default_shelf_life":730,"typical_unit":"g","substitute":"Stock Cubes","tags":["umami","seasoning","pantry"],"calories_per_100":220,"protein_per_100":12},
   {"name":"Seasoning Salt","category":"Pantry","default_shelf_life":1095,"typical_unit":"g","substitute":"All-Purpose Seasoning","tags":["salty","blend","pantry"],"calories_per_100":180,"protein_per_100":5},
   {"name":"Lemon Pepper","category":"Pantry","default_shelf_life":1095,"typical_unit":"g","substitute":"Black Pepper","tags":["citrus","peppery","pantry"],"calories_per_100":230,"protein_per_100":6}
-]
-```json
-[
   {"name":"Granulated Sugar","category":"Pantry","default_shelf_life":1825,"typical_unit":"g","substitute":"Caster Sugar","tags":["sweet","baking","pantry"],"calories_per_100":387,"protein_per_100":0},
   {"name":"Brown Sugar","category":"Pantry","default_shelf_life":1825,"typical_unit":"g","substitute":"White Sugar","tags":["caramel","baking","sweet"],"calories_per_100":380,"protein_per_100":0},
   {"name":"Caster Sugar","category":"Pantry","default_shelf_life":1825,"typical_unit":"g","substitute":"Granulated Sugar","tags":["fine","baking","sweet"],"calories_per_100":387,"protein_per_100":0},
@@ -193,9 +182,8 @@
   {"name":"Evaporated Milk","category":"Dairy","default_shelf_life":365,"typical_unit":"ml","substitute":"Condensed Milk","tags":["creamy","baking","pantry"],"calories_per_100":134,"protein_per_100":6.8},
   {"name":"Marshmallows","category":"Pantry","default_shelf_life":365,"typical_unit":"g","substitute":"Chocolate","tags":["sweet","treat","dessert"],"calories_per_100":318,"protein_per_100":1.8},
   {"name":"Ice Cream","category":"Dairy","default_shelf_life":90,"typical_unit":"tub","substitute":"Frozen Yogurt","tags":["dessert","sweet","treat"],"calories_per_100":207,"protein_per_100":3.5},
-  {"name":"Frozen Yogurt","category":"Dairy","default_shelf_life":90,"typical_unit":"tub","substitute":"Ice Cream","tags":["dessert","sweet","lighter"],"calories_per_100":127,"protein_per_100":4}
+  {"name":"Frozen Yogurt","category":"Dairy","default_shelf_life":90,"typical_unit":"tub","substitute":"Ice Cream","tags":["dessert","sweet","lighter"],"calories_per_100":127,"protein_per_100":4},
 
-  [
   {
     "name": "White Sandwich Bread",
     "category": "Grain",
@@ -287,3 +275,4 @@
     "protein_per_100": 24
   }
 ]
+

@@ -5,6 +5,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import PIL.Image
 from datetime import datetime
+import json
+
+# 1. Load the database into the server's memory
+with open('ingredients_master.json', 'r') as f:
+    INGREDIENTS_MASTER = json.load(f)
+
+print(f"✅ Loaded {len(INGREDIENTS_MASTER)} master ingredients.")
 
 # --- 1. CONFIGURATION ---
 app = Flask(__name__)
@@ -16,8 +23,8 @@ model = genai.GenerativeModel(
     model_name='gemini-2.5-flash-lite',
     generation_config={"response_mime_type": "application/json"},
     system_instruction=(
-        "You are the Manna AI Kitchen Engine. Your mission is to help students eat amazing, "
-        "healthy meals while wasting nothing. You must turn limited inventory into high-quality culinary experiences.\n\n"
+        "You are the Manna AI Kitchen Engine. Your mission is to help individuals eat amazing, healthy meals while wasting nothing. You must turn limited inventory into high-quality culinary experiences.\n\n"
+       
         "STRICT OPERATIONAL RULES:\n"
         "1. ZERO HALLUCINATIONS: Use ONLY the ingredients provided in the user's inventory. "
         "Do not assume the user has any items they did not list, with the sole exception of "
@@ -131,7 +138,6 @@ def generate_recipes():
         tastes = profile.get('tastes', {})
         
         # --- TIME-OF-DAY INTEGRATION ---
-        # 1. Get current hour to determine the 'Natural' meal
         current_hour = datetime.now().hour
         if 5 <= current_hour < 11:
             default_meal = "Breakfast"
@@ -142,16 +148,19 @@ def generate_recipes():
         else:
             default_meal = "Snack"
 
-        # 2. Logic: Priority goes to frontend 'mealType' (the card user clicked),
-        # otherwise defaults to the current clock-based meal.
         meal_context = data.get('mealType', default_meal)
-
         target_cals, target_protein = get_caloric_needs(profile)
         
-        # We use .format() instead of an f-string to avoid the "Invalid format specifier" error
+        # We define the prompt and use {{ }} for the JSON structure so .format() works
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
         Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
+        You are Manna AI, a strategic kitchen operator.
+
+        STRICT MASTER DATABASE: {master_db}
+
+        TASK: When generating ingredients or recipes, you MUST ONLY use items from the MASTER DATABASE. 
+        If an item is not in the database, use the 'substitute' listed in the database instead.
         
         User Profile: {user_profile}
         Daily Target: {target_cals}
@@ -160,12 +169,12 @@ def generate_recipes():
         Days until next shop: {days} days.
 
         TASK: 
-1. MANDATORY RATIONING: You must calculate a budget for every ingredient: (Total Quantity ÷ {days} days). 
-   The 'amountValue' for EACH recipe MUST be less than or equal to this daily budget. 
-   *Example: If user has 500g Beef and 5 days left, 'amountValue' for one recipe cannot exceed 100g.*
-2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory data provided.
-3. DATA TYPE: The 'amountValue' must be a raw Number, not a string.
-4. CULINARY ROUNDING: Use human-friendly numbers. Round grams to the nearest 50g (e.g., 150g, 200g). For pieces/units, use whole numbers or halves (e.g., 1 lemon, 0.5 onion). NEVER output more than one decimal point."
+        1. MANDATORY RATIONING: You must calculate a budget for every ingredient: (Total Quantity ÷ {days} days). 
+           The 'amountValue' for EACH recipe MUST be less than or equal to this daily budget. 
+           *Example: If user has 500g Beef and 5 days left, 'amountValue' for one recipe cannot exceed 100g.*
+        2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory data provided.
+        3. DATA TYPE: The 'amountValue' must be a raw Number, not a string.
+        4. CULINARY ROUNDING: Use human-friendly numbers. Round grams to the nearest 50g (e.g., 150g, 200g). For pieces/units, use whole numbers or halves (e.g., 1 lemon, 0.5 onion). NEVER output more than one decimal point."
        
         STRICT CONSTRAINTS:
         1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. (Salt, Pepper, Water, and 1 Oil allowed). 
@@ -194,6 +203,7 @@ def generate_recipes():
         - "instructions": [string steps]
         - "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
         """.format(
+            master_db=json.dumps(INGREDIENTS_MASTER),
             user_profile=json.dumps(profile),
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
@@ -203,17 +213,14 @@ def generate_recipes():
             meal_type=meal_context
         )
 
-        # Use the model with the system_instruction configured earlier
         response = model.generate_content(prompt)
-        
-        # Clean and validate the JSON
         recipes = clean_gemini_json(response.text)
         
         return jsonify(recipes)
 
     except Exception as e:
         print(f"Error in Recipe Generation: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({{"error": str(e)}}), 500
 
 @app.route('/api/shop', methods=['POST'])
 def generate_shopping_list():
@@ -230,8 +237,14 @@ def generate_shopping_list():
         # Calculate rough carb quota (approx 45% of energy)
         total_carbs_g = round(((target_cals * 0.45) / 4) * days)
 
-        # This prompt forces a high-density, metric-accurate procurement list
+        # Fix: The f-string now correctly holds the Master DB and uses {{ }} for JSON
         prompt = f"""
+        You are Manna AI, a strategic kitchen operator.
+        MASTER DATABASE: {json.dumps(INGREDIENTS_MASTER)}
+
+        TASK: When generating ingredients or recipes, you MUST ONLY use items from the MASTER DATABASE. 
+        If an item is not in the database, use the 'substitute' listed in the database instead.
+
         Role: Manna AI Strategic Procurement Agent.
         User: {name}
         Goal: {profile.get('goal')}
@@ -246,7 +259,7 @@ def generate_shopping_list():
         - Required Carb Volume: Total of {total_carbs_g}g from all grain/starch sources.
 
         STRICT TASTE ENFORCEMENT:
-        1. **Flavor Alignment**: You MUST include at least 3 specific aromatics or condiments that match the user's Craved Flavors (e.g., if 'Spicy', add Chili Flakes/Hot Sauce; if 'Tangy', add Vinegar/Lemon; if 'Creamy', add Greek Yogurt/Parmesan). 
+        1. **Flavor Alignment**: You MUST include at least 3 specific aromatics or condiments that match the user's Craved Flavors (e.g., if 'Spicy', add Chili Flakes/Hot Sauce; if 'Tangy', add Vinegar/Lemon; if 'Creamy', add Greek Yogurt/Cheese). 
         2. **Seasoning Level**: If user seasoning is 'Bold', you are FORBIDDEN from suggesting a list without at least 2 dry spices or fresh herbs (Garlic, Ginger, Cumin, etc.).
         3. **Breakfast Logic**: If Breakfast Style is 'Savory', prioritize eggs/proteins. If 'Sweet', prioritize fruits/grains.
 
@@ -276,11 +289,15 @@ def generate_shopping_list():
 
         OUTPUT FORMAT:
         Return ONLY a JSON array of objects with these exact keys:
-        - "name": String (include an emoji 🍎)
-        - "amount": String (e.g., "500g")
-        - "nutrition": String (brief summary like "High Protein, Zinc")
-        - "substitute": String (the backup option)
-        - "why": String (the strategic reason for this item)
+        [
+          {{
+            "name": "String (include an emoji 🍎)",
+            "amount": "500g",
+            "nutrition": "High Protein, Zinc",
+            "substitute": "String (the backup option)",
+            "why": "String (the strategic reason for this item)"
+          }}
+        ]
         """
 
         response = model.generate_content(prompt)
@@ -289,7 +306,7 @@ def generate_shopping_list():
 
     except Exception as e:
         print(f"Shopping List Error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({{"error": str(e)}}), 500
         
 @app.route('/api/inventory/update', methods=['POST'])
 def update_inventory():
@@ -337,4 +354,3 @@ if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-

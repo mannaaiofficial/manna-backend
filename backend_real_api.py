@@ -146,10 +146,11 @@ def generate_recipes():
         else:
             default_meal = "Snack"
 
+        # This allows the frontend to send a specific 'mealType' (e.g., Breakfast)
         meal_context = data.get('mealType', default_meal)
         target_cals, target_protein = get_caloric_needs(profile)
         
-        # We define the prompt and use {{ }} for the JSON structure so .format() works
+        # PROMPT REWRITTEN FOR SINGLE OUTPUT (NO SHORTENING)
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
         Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
@@ -178,19 +179,18 @@ def generate_recipes():
         1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. (Salt, Pepper, Water, and 1 Oil allowed). 
         2. DIETARY PURITY: Strictly follow the diet specified in the profile.
         3. ZERO-WASTE PRIORITY: Focus on using up expiring items first.
-        4. ROTTENING LOGIC: Prioritize items with 'daysLeft' <= 2. They MUST be used in the first recipe.
+        4. ROTTENING LOGIC: Prioritize items with 'daysLeft' <= 2. They MUST be used in this recipe.
         5. PALATE ALIGNMENT: User tastes are {tastes}. If they like 'Tangy', suggest dressings (like Caesar). If 'Bold', increase seasoning.
-        6. MEAL CONTEXT: This is for {meal_type}. If 'Breakfast', respect the 'breakfastStyle' preference (Sweet vs Savory).
+        6. MEAL CONTEXT: This is strictly for {meal_type}. If 'Breakfast', respect the 'breakfastStyle' preference (Sweet vs Savory).
 
         OUTPUT FORMAT:
-        Return ONLY a JSON list of 3 recipe objects. Each must have:
-        [
-          {{
+        Return ONLY a single JSON object (NOT A LIST) for this meal. It must have:
+        {{
             "id": "unique string",
             "title": "appetizing name",
-            "description": "description",
-            "calories": "number",
-            "macros": {{ "p": "number", "c": "number", "f": "number" }},
+            "description": "Provide a strategic reason why this was chosen for their {meal_type}.",
+            "calories": number,
+            "macros": {{ "p": number, "c": number, "f": number }},
             "time": "string",
             "ingredients": [
                 {{ 
@@ -202,8 +202,7 @@ def generate_recipes():
               ],
             "instructions": ["string steps"],
             "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
-          }}
-        ]
+        }}
         """.format(
             master_db=json.dumps(INGREDIENTS_MASTER),
             user_profile=json.dumps(profile),
@@ -216,13 +215,17 @@ def generate_recipes():
         )
 
         response = model.generate_content(prompt)
-        recipes = clean_gemini_json(response.text)
+        recipe = clean_gemini_json(response.text)
         
-        return jsonify(recipes)
+        # Ensuring we return a single object, not a list of one
+        if isinstance(recipe, list) and len(recipe) > 0:
+            recipe = recipe[0]
+        
+        return jsonify(recipe)
 
     except Exception as e:
         print(f"Error in Recipe Generation: {e}")
-        return jsonify({{"error": str(e)}}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/shop', methods=['POST'])
 def generate_shopping_list():
@@ -356,3 +359,4 @@ if __name__ == '__main__':
     # Using the port Render expects
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+

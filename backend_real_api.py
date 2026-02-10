@@ -8,7 +8,11 @@ from datetime import datetime
 import json
 
 # 1. Load the database into the server's memory
-with open('ingredients_master.json', 'r') as f:
+# FIX: Using absolute path to ensure Render finds the file reliably
+current_dir = os.path.dirname(os.path.abspath(__file__))
+json_path = os.path.join(current_dir, 'ingredients_master.json')
+
+with open(json_path, 'r') as f:
     INGREDIENTS_MASTER = json.load(f)
 
 print(f"✅ Loaded {len(INGREDIENTS_MASTER)} master ingredients.")
@@ -24,7 +28,7 @@ model = genai.GenerativeModel(
     generation_config={"response_mime_type": "application/json"},
     system_instruction=(
         "You are the Manna AI Kitchen Engine. Your mission is to help individuals eat amazing, healthy meals while wasting nothing. You must turn limited inventory into high-quality culinary experiences.\n\n"
-       
+        
         "STRICT OPERATIONAL RULES:\n"
         "1. ZERO HALLUCINATIONS: Use ONLY the ingredients provided in the user's inventory. "
         "Do not assume the user has any items they did not list, with the sole exception of "
@@ -186,22 +190,26 @@ def generate_recipes():
 
         OUTPUT FORMAT:
         Return ONLY a JSON list of 3 recipe objects. Each must have:
-        - "id": unique string
-        - "title": appetizing name
-        - "description": description
-        - "calories": number
-        - "macros": {{ "p": number, "c": number, "f": number }}
-        - "time": string
-        - "ingredients": [
-            {{ 
-              "name": "match inventory exactly", 
-              "amount": "150g", 
-              "amountValue": 150, 
-              "unit": "g" 
-            }}
-          ]
-        - "instructions": [string steps]
-        - "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
+        [
+          {{
+            "id": "unique string",
+            "title": "appetizing name",
+            "description": "description",
+            "calories": number,
+            "macros": {{ "p": number, "c": number, "f": number }},
+            "time": "string",
+            "ingredients": [
+                {{ 
+                  "name": "match inventory exactly", 
+                  "amount": "150g", 
+                  "amountValue": 150, 
+                  "unit": "g" 
+                }}
+              ],
+            "instructions": ["string steps"],
+            "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
+          }}
+        ]
         """.format(
             master_db=json.dumps(INGREDIENTS_MASTER),
             user_profile=json.dumps(profile),
@@ -348,7 +356,7 @@ def update_inventory():
         })
     except Exception as e:
         print(f"Inventory Update Error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({{"error": str(e)}}), 500
 
 if __name__ == '__main__':
     # Using the port Render expects

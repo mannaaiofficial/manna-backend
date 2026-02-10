@@ -6,8 +6,7 @@ from flask_cors import CORS
 import PIL.Image
 from datetime import datetime
 
-# 1. Load the database into the server's memory
-# FIX: Using absolute path ensures Render finds the file even if it starts in a different directory.
+# Replace your current loading block with this:
 current_dir = os.path.dirname(os.path.abspath(__file__))
 json_path = os.path.join(current_dir, 'ingredients_master.json')
 

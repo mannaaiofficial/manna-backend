@@ -1,4 +1,3 @@
-```json
 [
   {"name":"Spinach","category":"Vegetable","default_shelf_life":5,"typical_unit":"bag","substitute":"Kale","tags":["leafy","iron-rich","fresh"],"calories_per_100":23,"protein_per_100":2.9},
   {"name":"Kale","category":"Vegetable","default_shelf_life":7,"typical_unit":"bag","substitute":"Spinach","tags":["leafy","fiber","green"],"calories_per_100":49,"protein_per_100":4.3},
@@ -288,6 +287,3 @@
     "protein_per_100": 24
   }
 ]
-
-]
-```

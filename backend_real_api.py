@@ -5,10 +5,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import PIL.Image
 from datetime import datetime
-import json
 
 # 1. Load the database into the server's memory
-# FIX: Using absolute path to ensure Render finds the file reliably
+# FIX: Using absolute path ensures Render finds the file even if it starts in a different directory.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 json_path = os.path.join(current_dir, 'ingredients_master.json')
 
@@ -195,8 +194,8 @@ def generate_recipes():
             "id": "unique string",
             "title": "appetizing name",
             "description": "description",
-            "calories": number,
-            "macros": {{ "p": number, "c": number, "f": number }},
+            "calories": "number",
+            "macros": {{ "p": "number", "c": "number", "f": "number" }},
             "time": "string",
             "ingredients": [
                 {{ 

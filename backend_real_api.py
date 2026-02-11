@@ -311,7 +311,7 @@ def generate_shopping_list():
 
     except Exception as e:
         print(f"Shopping List Error: {e}")
-        return jsonify({{"error": str(e)}}), 500
+        return jsonify({"error": str(e)}), 500
         
 @app.route('/api/inventory/update', methods=['POST'])
 def update_inventory():
@@ -353,7 +353,7 @@ def update_inventory():
         })
     except Exception as e:
         print(f"Inventory Update Error: {e}")
-        return jsonify({{"error": str(e)}}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Using the port Render expects

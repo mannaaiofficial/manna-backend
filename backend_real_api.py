@@ -45,33 +45,31 @@ model = genai.GenerativeModel(
         "instructions (step-by-step), and a relevant Unsplash image URL. UNIT CONSISTENCY: You MUST use the same 'unit' and 'name' provided in the user's inventory JSON."
     )
 )
-# --- 2. THE CLEANER ---
 def clean_gemini_json(text):
-    """Bulletproof filter to extract JSON even if the AI adds chatter."""
+    """Bulletproof filter to extract the Daily Plan Object."""
     try:
-        # 1. Remove markdown code blocks if they exist
-        clean = text.replace("```json", "").replace("```", "").strip()
+        # 1. Clean up markdown triple backticks
+        text = text.replace("```json", "").replace("```", "").strip()
         
-        # 2. Find the FIRST '[' and the LAST ']'
-        start = clean.find("[")
-        end = clean.rfind("]")
+        # 2. Find the bounds of the JSON object
+        start = text.find("{")
+        end = text.rfind("}")
         
         if start != -1 and end != -1:
-            json_str = clean[start:end + 1]
+            # 3. Slice the string to only include what is inside { }
+            json_str = text[start:end + 1]
             return json.loads(json_str)
         
-        # 3. Fallback: If it's an object with a 'recipes' key instead of a list
-        start_obj = clean.find("{")
-        end_obj = clean.rfind("}")
-        if start_obj != -1:
-            data = json.loads(clean[start_obj:end_obj + 1])
-            return data.get('recipes', data) # Return the list inside or the object
-            
-        return []
+        # 4. Emergency fallback if it's a list instead
+        start_list = text.find("[")
+        end_list = text.rfind("]")
+        if start_list != -1 and end_list != -1:
+            return json.loads(text[start_list:end_list + 1])
+
+        return {"error": "No JSON found"}
     except Exception as e:
-        print(f"CRITICAL CLEANER ERROR: {e}")
-        print(f"RAW TEXT THAT FAILED: {text[:200]}...") # See the first 200 chars
-        return []
+        print(f"CLEANER ERROR: {e}")
+        return {"error": "Invalid JSON structure"}
 
 # --- 3. THE BIO-CALCULATOR (FINAL MVP VERSION) ---
 def get_caloric_needs(data):

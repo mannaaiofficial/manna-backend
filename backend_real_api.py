@@ -45,32 +45,27 @@ model = genai.GenerativeModel(
         "instructions (step-by-step), and a relevant Unsplash image URL. UNIT CONSISTENCY: You MUST use the same 'unit' and 'name' provided in the user's inventory JSON."
     )
 )
+import json
+
 def clean_gemini_json(text):
-    """Bulletproof filter to extract the Daily Plan Object."""
     try:
-        # 1. Clean up markdown triple backticks
+        # 1. Remove markdown noise
         text = text.replace("```json", "").replace("```", "").strip()
         
-        # 2. Find the bounds of the JSON object
-        start = text.find("{")
-        end = text.rfind("}")
-        
-        if start != -1 and end != -1:
-            # 3. Slice the string to only include what is inside { }
-            json_str = text[start:end + 1]
-            return json.loads(json_str)
-        
-        # 4. Emergency fallback if it's a list instead
-        start_list = text.find("[")
-        end_list = text.rfind("]")
-        if start_list != -1 and end_list != -1:
-            return json.loads(text[start_list:end_list + 1])
+        # 2. Find the actual start of the data
+        start_idx = text.find("{") if text.find("{") != -1 else text.find("[")
+        if start_idx == -1: return {"error": "No JSON found"}
 
-        return {"error": "No JSON found"}
+        # 3. The "Slicer": Use a decoder to read only the VALID part
+        # This ignores the 'Extra data' at line 7 that is crashing you
+        content = text[start_idx:]
+        decoder = json.JSONDecoder()
+        data, end_pos = decoder.raw_decode(content)
+        
+        return data
     except Exception as e:
-        print(f"CLEANER ERROR: {e}")
-        return {"error": "Invalid JSON structure"}
-
+        print(f"CLEANER CRASH: {e}")
+        return {"error": "Invalid structure"}
 # --- 3. THE BIO-CALCULATOR (FINAL MVP VERSION) ---
 def get_caloric_needs(data):
     """

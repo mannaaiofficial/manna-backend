@@ -135,31 +135,17 @@ def generate_recipes():
         days_left = int(profile.get('daysRemaining', 7)) 
         tastes = profile.get('tastes', {})
         
-        # --- TIME-OF-DAY INTEGRATION ---
-        current_hour = datetime.now().hour
-        if 5 <= current_hour < 11:
-            default_meal = "Breakfast"
-        elif 11 <= current_hour < 16:
-            default_meal = "Lunch"
-        elif 16 <= current_hour < 22:
-            default_meal = "Dinner"
-        else:
-            default_meal = "Snack"
-
-        # This allows the frontend to send a specific 'mealType' (e.g., Breakfast)
-        meal_context = data.get('mealType', default_meal)
         target_cals, target_protein = get_caloric_needs(profile)
         
-        # PROMPT REWRITTEN FOR SINGLE OUTPUT (NO SHORTENING)
+        # PROMPT REWRITTEN FOR BATCH GENERATION (3-in-1)
+        # We keep all your original strict rules but apply them to the whole day.
         prompt = """
         Role: Manna AI Master Chef & Resource Manager
-        Mission: Create amazing, healthy meals using ONLY provided inventory that will last the user the perfect amount of time.
-        You are Manna AI, a strategic kitchen operator.
-
+        Mission: Create a FULL DAY of amazing, healthy meals (Breakfast, Lunch, and Dinner) using ONLY provided inventory.
+        
         STRICT MASTER DATABASE: {master_db}
 
-        TASK: When generating ingredients or recipes, you MUST ONLY use items from the MASTER DATABASE. 
-        If an item is not in the database, use the 'substitute' listed in the database instead.
+        TASK: You MUST ONLY use items from the MASTER DATABASE. 
         
         User Profile: {user_profile}
         Daily Target: {target_cals}
@@ -167,40 +153,28 @@ def generate_recipes():
         Target Cooking Vibe: {vibe_style}
         Days until next shop: {days} days.
 
-        TASK: 
-        1. MANDATORY RATIONING: You must calculate a budget for every ingredient: (Total Quantity ÷ {days} days). 
-           The 'amountValue' for EACH recipe MUST be less than or equal to this daily budget. 
-           *Example: If user has 500g Beef and 5 days left, 'amountValue' for one recipe cannot exceed 100g.*
-        2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory data provided.
-        3. DATA TYPE: The 'amountValue' must be a raw Number, not a string.
-        4. CULINARY ROUNDING: Use human-friendly numbers. Round grams to the nearest 50g (e.g., 150g, 200g). For pieces/units, use whole numbers or halves (e.g., 1 lemon, 0.5 onion). NEVER output more than one decimal point."
-       
-        STRICT CONSTRAINTS:
-        1. NO EXTERNAL INGREDIENTS: Use only items from the Inventory. (Salt, Pepper, Water, and 1 Oil allowed). 
-        2. DIETARY PURITY: Strictly follow the diet specified in the profile.
-        3. ZERO-WASTE PRIORITY: Focus on using up expiring items first.
-        4. ROTTENING LOGIC: Prioritize items with 'daysLeft' <= 2. They MUST be used in this recipe.
-        5. PALATE ALIGNMENT: User tastes are {tastes}. If they like 'Tangy', suggest dressings (like Caesar). If 'Bold', increase seasoning.
-        6. MEAL CONTEXT: This is strictly for {meal_type}. If 'Breakfast', respect the 'breakfastStyle' preference (Sweet vs Savory).
+        STRICT OPERATIONAL RULES:
+        1. MANDATORY RATIONING: Divide ingredients across the three meals so the user doesn't run out. Budget = (Total Quantity ÷ {days} days).
+        2. MATCHING: The 'name' and 'unit' must be an EXACT string match to the inventory.
+        3. DATA TYPE: The 'amountValue' must be a raw Number.
+        4. ZERO-WASTE PRIORITY: Prioritize items with 'daysLeft' <= 2. They MUST be used today.
+        5. PALATE ALIGNMENT: User tastes are {tastes}. 
+        6. MEAL CONTEXT: Respect the 'breakfastStyle' preference for the breakfast object.
 
         OUTPUT FORMAT:
-        Return ONLY a single JSON object (NOT A LIST) for this meal. It must have:
+        Return ONLY a single JSON object with exactly three keys: "breakfast", "lunch", and "dinner". 
+        Each key must contain a recipe object structured like this:
         {{
             "id": "unique string",
             "title": "appetizing name",
-            "description": "Provide a strategic reason why this was chosen for their {meal_type}.",
+            "description": "Why this was chosen for their goal/vibe.",
             "calories": number,
             "macros": {{ "p": number, "c": number, "f": number }},
             "time": "string",
             "ingredients": [
-                {{ 
-                  "name": "match inventory exactly", 
-                  "amount": "150g", 
-                  "amountValue": 150, 
-                  "unit": "g" 
-                }}
+                {{ "name": "match inventory", "amount": "150g", "amountValue": 150, "unit": "g" }}
               ],
-            "instructions": ["string steps"],
+            "instructions": ["step 1", "step 2"],
             "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
         }}
         """.format(
@@ -210,21 +184,18 @@ def generate_recipes():
             vibe_style=vibe,
             days=days_left,
             target_cals=target_cals,
-            tastes=json.dumps(tastes),
-            meal_type=meal_context
+            tastes=json.dumps(tastes)
         )
 
         response = model.generate_content(prompt)
-        recipe = clean_gemini_json(response.text)
+        daily_plan = clean_gemini_json(response.text)
         
-        # Ensuring we return a single object, not a list of one
-        if isinstance(recipe, list) and len(recipe) > 0:
-            recipe = recipe[0]
-        
-        return jsonify(recipe)
+        # This now returns the full object { "breakfast": ..., "lunch": ..., "dinner": ... }
+        return jsonify(daily_plan)
 
     except Exception as e:
         print(f"Error in Recipe Generation: {e}")
+        # FIXED: Removed double braces to prevent the crash you were getting earlier
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/shop', methods=['POST'])

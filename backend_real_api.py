@@ -22,7 +22,7 @@ with open(json_path, 'r') as f:
 print(f"✅ Loaded {len(INGREDIENTS_MASTER)} master ingredients.")
 
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
+    model_name='gemini-flash-latest',
     generation_config={"response_mime_type": "application/json"},
     system_instruction=(
         "You are the Manna AI Kitchen Engine. Your mission is to help individuals eat amazing, healthy meals while wasting nothing. You must turn limited inventory into high-quality culinary experiences.\n\n"

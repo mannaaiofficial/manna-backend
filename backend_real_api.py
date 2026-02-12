@@ -22,7 +22,7 @@ CORS(app)
 # Move these to the top so all functions can see them
 # --- 1. CONFIGURATION ---
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
+    model_name='gemini-flash-latest',
     generation_config={"response_mime_type": "application/json"},
     system_instruction=(
         "You are the Manna AI Kitchen Engine. Your mission is to help individuals eat amazing, healthy meals while wasting nothing. You must turn limited inventory into high-quality culinary experiences.\n\n"

@@ -22,7 +22,7 @@ CORS(app)
 # Move these to the top so all functions can see them
 # --- 1. CONFIGURATION ---
 model = genai.GenerativeModel(
-    model_name='gemini-2.5-flash-lite',
+    model_name='gemini-1.5-flash',
     generation_config={"response_mime_type": "application/json"},
     system_instruction=(
         "You are the Manna AI Kitchen Engine. Your mission is to help individuals eat amazing, healthy meals while wasting nothing. You must turn limited inventory into high-quality culinary experiences.\n\n"
@@ -123,6 +123,10 @@ def generate_recipes():
     try:
         data = request.json
         inventory = data.get('inventory', [])
+        relevant_master_data = [
+            m for m in INGREDIENTS_MASTER 
+            if any(i['name'].lower() in m['name'].lower() for i in inventory)
+        ]
         profile = data.get('userProfile', {})
         vibe = profile.get('vibe', 'Speed')
         days_left = int(profile.get('daysRemaining', 7)) 
@@ -171,7 +175,7 @@ def generate_recipes():
             "image": "https://images.unsplash.com/photo-[ID]?w=800&q=80"
         }}
         """.format(
-            master_db=json.dumps(INGREDIENTS_MASTER),
+            master_db=json.dumps(relevant_master_data),          
             user_profile=json.dumps(profile),
             inventory_data=json.dumps(inventory),
             vibe_style=vibe,
